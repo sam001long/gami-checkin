@@ -34,7 +34,6 @@ export default function GameBoard({ level }: { level: Level }) {
 
     if (pass && hasRequired) {
       setIsSuccess(true);
-      // 🔥 核心新增：通關瞬間，寫入 localStorage 存檔
       const saved = JSON.parse(localStorage.getItem('gami_progress') || '{}');
       saved[level.id] = true;
       localStorage.setItem('gami_progress', JSON.stringify(saved));
@@ -110,13 +109,30 @@ export default function GameBoard({ level }: { level: Level }) {
         const newPlaced = { ...placed };
         delete newPlaced[dragging.fromSlot];
         setPlaced(newPlaced);
-        
         const newPoses = { ...poses };
         delete newPoses[dragging.fromSlot];
         setPoses(newPoses);
       }
     }
     setDragging(null);
+  };
+
+  // 🔥 核心新增：喚起 LINE 分享好友介面
+  const handleShare = () => {
+    // @ts-ignore
+    if (window.liff && window.liff.isApiAvailable('shareTargetPicker')) {
+      // @ts-ignore
+      window.liff.shareTargetPicker([{
+        type: "text",
+        text: `我剛在《角面星人打卡》成功完成了【${level.title}】！\n這些外星人真的有夠難塞🤣\n快來挑戰看看你過不過得了：\nhttps://liff.line.me/2010251224-ecBZ1NJR`
+      }]).then((res: any) => {
+        if (res) alert("已成功發送戰績給好友！");
+      }).catch((error: any) => {
+        console.error("分享失敗", error);
+      });
+    } else {
+      alert("請在手機 LINE 裡面開啟遊戲，才能使用好友分享功能喔！");
+    }
   };
 
   const placedChars = Object.values(placed);
@@ -201,8 +217,15 @@ export default function GameBoard({ level }: { level: Level }) {
           <div className="bg-slate-800 p-8 rounded-3xl border border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.3)] text-center max-w-[80%]">
             <div className="text-5xl mb-4">🎉</div>
             <h2 className="text-3xl font-black text-yellow-400 mb-4">打卡成功！</h2>
-            <p className="text-slate-200 mb-8 leading-relaxed">{level.successMessage}</p>
-            <Link href="/levels" className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95">
+            <p className="text-slate-200 mb-6 leading-relaxed">{level.successMessage}</p>
+            
+            {/* 新增的 LINE 分享按鈕 */}
+            <button onClick={handleShare} className="bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 4.269 8.846 10.036 9.608.391.084.922.258 1.057.592.122.303.079.778.039 1.085l-.171 1.027c-.053.303-.242 1.186 1.039.647 1.281-.54 6.911-4.069 9.428-6.967 1.739-1.907 2.572-3.844 2.572-5.992z"/></svg>
+              分享給 LINE 好友
+            </button>
+            
+            <Link href="/levels" className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95">
               回關卡選擇
             </Link>
           </div>
