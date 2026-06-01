@@ -1,10 +1,10 @@
-﻿import { Level } from '@/types/game'; //
+import { Level } from '@/types/game';
 
 export const levels: Level[] = [
   {
     id: 'level-01',
-    title: '摰霅辣??,
-    subtitle: '?飛??憭批振銝?鈭????,
+    title: '官方證件照',
+    subtitle: '先學會讓大家不要互相擋臉。',
     backgroundSrc: '/levels/level-01-bg.png',
     frame: { x: 20, y: 90, width: 335, height: 430 },
     landmarkSafeAreas: [],
@@ -14,17 +14,17 @@ export const levels: Level[] = [
       { id: 'front-center', x: 175, y: 330, row: 'front', allowedCharacterIds: ['aogao'], allowedPoseIds: ['stand'], tolerance: 36, required: true },
       { id: 'back-center', x: 175, y: 245, row: 'back', allowedCharacterIds: ['jianjian'], allowedPoseIds: ['stand'], tolerance: 36, required: true }
     ],
-    successMessage: '摰霅辣?批?????絲靘??舀芣芰???
+    successMessage: '官方證件照完成！雖然看起來還是怪怪的。'
   },
   { 
     id: 'level-02', 
-    title: '?啣?擃??', 
-    subtitle: '?唳??格??飛???賡雿?憛?, 
+    title: '台北高塔打卡', 
+    subtitle: '地標遮擋教學。不能遮住高塔。', 
     backgroundSrc: '/levels/level-02-bg.png', 
     frame: { x: 20, y: 90, width: 335, height: 430 }, 
     landmarkSafeAreas: [{ x: 150, y: 100, width: 80, height: 150 }], 
     characters: ['fangfang', 'jianjian', 'aogao', 'yuanyuan', 'changchang'], 
     slots: [], 
-    successMessage: '擃????嚗? 
+    successMessage: '高塔打卡成功！' 
   }
-]; //
+];

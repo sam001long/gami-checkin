@@ -1,9 +1,9 @@
-﻿export type Rect = {
+export type Rect = {
   x: number;
   y: number;
   width: number;
   height: number;
-}; //
+};
 
 export type CharacterPose = {
   id: string;
@@ -13,7 +13,7 @@ export type CharacterPose = {
   height: number;
   faceBox: Rect;
   bodyBox: Rect;
-}; //
+};
 
 export type Character = {
   id: string;
@@ -22,7 +22,7 @@ export type Character = {
   description: string;
   defaultPoseId: string;
   poses: CharacterPose[];
-}; //
+};
 
 export type LevelSlot = {
   id: string;
@@ -33,7 +33,7 @@ export type LevelSlot = {
   allowedPoseIds?: string[];
   tolerance: number;
   required: boolean;
-}; //
+};
 
 export type Level = {
   id: string;
@@ -47,4 +47,4 @@ export type Level = {
   timeLimitSec?: number;
   moveLimit?: number;
   successMessage: string;
-}; //
+};

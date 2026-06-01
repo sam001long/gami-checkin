@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { levels } platform = 'next/navigation';
+import { levels } from '@/data/levels';
 import { notFound } from 'next/navigation';
 
 export default async function GamePage({ params }: { params: Promise<{ levelId: string }> }) {
