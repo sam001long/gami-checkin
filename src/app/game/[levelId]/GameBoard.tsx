@@ -117,7 +117,6 @@ export default function GameBoard({ level }: { level: Level }) {
     setDragging(null);
   };
 
-  // 🔥 核心新增：喚起 LINE 分享好友介面
   const handleShare = () => {
     // @ts-ignore
     if (window.liff && window.liff.isApiAvailable('shareTargetPicker')) {
@@ -136,28 +135,56 @@ export default function GameBoard({ level }: { level: Level }) {
   };
 
   const placedChars = Object.values(placed);
-  const getCharDisplayName = (id: string, poseId: string = 'stand') => {
+  
+  // 🔥 新增：取得角色圖片與Fallback顏色
+  const getCharImage = (id: string, poseId: string = 'stand') => {
     const charData = characters.find(c => c.id === id);
-    const poseName = charData?.poses.find(p => p.id === poseId)?.name || '未知';
-    return `${charData?.name || id}\n(${poseName})`;
+    return charData?.poses.find(p => p.id === poseId)?.imageSrc;
   };
-  const getCharColor = (id: string) => id === 'fangfang' ? 'bg-blue-500' : id === 'jianjian' ? 'bg-red-500' : 'bg-green-500';
+  const getCharColor = (id: string) => id === 'fangfang' ? 'bg-blue-500' : id === 'jianjian' ? 'bg-red-500' : id === 'aogao' ? 'bg-green-500' : 'bg-pink-500';
+
+  // 渲染角色的通用組件
+  const CharacterAvatar = ({ id, poseId, isDragging, onDown }: { id: string, poseId: string, isDragging?: boolean, onDown?: (e: React.PointerEvent) => void }) => {
+    const imgSrc = getCharImage(id, poseId);
+    const colorClass = getCharColor(id);
+    const charName = characters.find(c => c.id === id)?.name || id;
+
+    return (
+      <div onPointerDown={onDown}
+           className={`w-16 h-16 rounded-xl flex items-center justify-center font-bold shadow-lg cursor-grab active:scale-95 transition-transform overflow-hidden relative group border-2 border-white/20 ${colorClass} ${isDragging ? 'opacity-50' : ''}`}>
+        {/* 如果未來放了圖片，就顯示圖片，否則顯示文字 */}
+        <img src={imgSrc} alt={charName} 
+             className="w-full h-full object-cover absolute inset-0 z-10 scale-110 drop-shadow-md"
+             onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+        <span className="text-white text-xs z-0 whitespace-pre-line text-center leading-tight">
+          {charName}
+          <br/>
+          <span className="text-[10px] opacity-80">({characters.find(c => c.id === id)?.poses.find(p => p.id === poseId)?.name})</span>
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-900 justify-between select-none touch-none overflow-hidden relative"
          onPointerMove={handlePointerMove}
          onPointerUp={handlePointerUp}>
       
-      <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center z-10 shrink-0">
+      <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center z-10 shrink-0 shadow-md">
         <div>
-          <h3 className="font-bold text-lg text-yellow-400">{level.title}</h3>
+          <h3 className="font-bold text-lg text-yellow-400 drop-shadow-sm">{level.title}</h3>
           <p className="text-xs text-slate-400">{level.subtitle}</p>
         </div>
-        <Link href="/levels" className="bg-slate-700 text-xs px-3 py-1.5 rounded-lg hover:bg-slate-600 text-white">放棄</Link>
+        <Link href="/levels" className="bg-slate-700 text-xs px-3 py-1.5 rounded-lg hover:bg-slate-600 text-white border border-slate-600">放棄</Link>
       </div>
 
       <div ref={boardRef} className="flex-1 relative bg-slate-950 flex items-center justify-center p-2 overflow-hidden">
-         <div className="w-[335px] h-[430px] max-h-full max-w-full aspect-[335/430] border-2 border-slate-700 rounded-2xl relative bg-slate-800/50 shadow-inner scale-95 origin-center transition-all">
+         {/* 背景圖實裝：讀取 level.backgroundSrc */}
+         <div className="w-[335px] h-[430px] max-h-full max-w-full aspect-[335/430] border-2 border-slate-700 rounded-2xl relative bg-slate-800/50 shadow-inner scale-95 origin-center transition-all overflow-hidden">
+            
+            <img src={level.backgroundSrc} className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none" 
+                 onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+
             {level.slots.map(slot => {
               const isPlaced = placed[slot.id];
               const isDraggingThis = dragging?.id === isPlaced && dragging?.fromSlot === slot.id;
@@ -166,16 +193,11 @@ export default function GameBoard({ level }: { level: Level }) {
 
               return (
                 <div key={slot.id}
-                     className={`absolute w-16 h-16 rounded-full -ml-8 -mt-8 ${zIndex} flex items-center justify-center ${!isPlaced ? 'border-2 border-dashed border-slate-500 bg-slate-700/30' : ''}`}
+                     className={`absolute w-16 h-16 rounded-full -ml-8 -mt-8 ${zIndex} flex items-center justify-center ${!isPlaced ? 'border-2 border-dashed border-slate-500 bg-slate-700/30 backdrop-blur-sm' : ''}`}
                      style={{ left: slot.x, top: slot.y }}>
-
-                   {!isPlaced && <span className="text-slate-500 text-[10px]">站位</span>}
-
+                   {!isPlaced && <span className="text-slate-400 text-[10px] font-medium">站位</span>}
                    {isPlaced && !isDraggingThis && (
-                     <div onPointerDown={(e) => handlePointerDown(e, isPlaced, slot.id)}
-                          className={`w-16 h-16 ${getCharColor(isPlaced)} rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-lg cursor-grab border-2 border-white/20 active:scale-95 transition-transform text-center whitespace-pre-line`}>
-                        {getCharDisplayName(isPlaced, currentPoseId)}
-                     </div>
+                     <CharacterAvatar id={isPlaced} poseId={currentPoseId} onDown={(e) => handlePointerDown(e, isPlaced, slot.id)} />
                    )}
                 </div>
               );
@@ -183,29 +205,25 @@ export default function GameBoard({ level }: { level: Level }) {
          </div>
 
          {dragging && (
-           <div className={`fixed z-50 w-16 h-16 ${getCharColor(dragging.id)} rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-2xl opacity-90 pointer-events-none -ml-8 -mt-8 border-2 border-white/50 scale-110 transition-transform text-center whitespace-pre-line`}
-                style={{ left: dragPos.x, top: dragPos.y }}>
-             {getCharDisplayName(dragging.id, dragging.fromSlot ? poses[dragging.fromSlot] : 'stand')}
+           <div className="fixed z-50 pointer-events-none -ml-8 -mt-8 scale-110" style={{ left: dragPos.x, top: dragPos.y }}>
+             <CharacterAvatar id={dragging.id} poseId={dragging.fromSlot ? poses[dragging.fromSlot] : 'stand'} />
            </div>
          )}
       </div>
 
-      <div className="bg-slate-800 border-t border-slate-700 p-3 min-h-[100px] z-10 shrink-0 pb-6">
-        <div className="text-xs text-slate-400 mb-2">待命角色區 (按住拖曳，輕點換姿勢)：</div>
-        <div className="flex gap-2 overflow-x-auto pb-1 px-1">
+      <div className="bg-slate-800 border-t border-slate-700 p-3 min-h-[100px] z-10 shrink-0 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.3)]">
+        <div className="text-xs text-slate-400 mb-2 font-medium">待命角色區 <span className="text-yellow-500">(按住拖曳，輕點換姿勢)</span>：</div>
+        <div className="flex gap-3 overflow-x-auto pb-1 px-1 custom-scrollbar">
           {level.characters.map((charId) => {
             const isPlaced = placedChars.includes(charId);
             const isDraggingThis = dragging?.id === charId && !dragging.fromSlot;
 
             if (isPlaced && !isDraggingThis) {
-              return <div key={charId} className="w-16 h-16 bg-slate-800 border border-slate-700 rounded-xl opacity-20 shrink-0" />;
+              return <div key={charId} className="w-16 h-16 bg-slate-900 border-2 border-slate-800 rounded-xl opacity-40 shrink-0 shadow-inner" />;
             }
-
             return (
-              <div key={charId}
-                   onPointerDown={(e) => handlePointerDown(e, charId, null)}
-                   className={`w-16 h-16 ${getCharColor(charId)} rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-md cursor-grab active:cursor-grabbing shrink-0 text-center whitespace-pre-line ${isDraggingThis ? 'opacity-30' : ''}`}>
-                {getCharDisplayName(charId)}
+              <div key={charId} className="shrink-0">
+                <CharacterAvatar id={charId} poseId="stand" isDragging={isDraggingThis} onDown={(e) => handlePointerDown(e, charId, null)} />
               </div>
             );
           })}
@@ -215,17 +233,16 @@ export default function GameBoard({ level }: { level: Level }) {
       {isSuccess && (
         <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-slate-800 p-8 rounded-3xl border border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.3)] text-center max-w-[80%]">
-            <div className="text-5xl mb-4">🎉</div>
-            <h2 className="text-3xl font-black text-yellow-400 mb-4">打卡成功！</h2>
-            <p className="text-slate-200 mb-6 leading-relaxed">{level.successMessage}</p>
+            <div className="text-5xl mb-4 animate-bounce">🎉</div>
+            <h2 className="text-3xl font-black text-yellow-400 mb-4 drop-shadow-md">打卡成功！</h2>
+            <p className="text-slate-200 mb-6 leading-relaxed font-medium">{level.successMessage}</p>
             
-            {/* 新增的 LINE 分享按鈕 */}
             <button onClick={handleShare} className="bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2">
               <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 4.269 8.846 10.036 9.608.391.084.922.258 1.057.592.122.303.079.778.039 1.085l-.171 1.027c-.053.303-.242 1.186 1.039.647 1.281-.54 6.911-4.069 9.428-6.967 1.739-1.907 2.572-3.844 2.572-5.992z"/></svg>
               分享給 LINE 好友
             </button>
             
-            <Link href="/levels" className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95">
+            <Link href="/levels" className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 border border-slate-600">
               回關卡選擇
             </Link>
           </div>
