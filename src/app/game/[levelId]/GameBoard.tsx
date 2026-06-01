@@ -7,15 +7,14 @@ import { characters } from '@/data/characters';
 
 export default function GameBoard({ level }: { level: Level }) {
   const [placed, setPlaced] = useState<Record<string, string>>({});
-  const [poses, setPoses] = useState<Record<string, string>>({}); // 紀錄每個 Slot 上的角色姿勢
+  const [poses, setPoses] = useState<Record<string, string>>({});
   const [dragging, setDragging] = useState<{ id: string, fromSlot: string | null } | null>(null);
   const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-  const [isSuccess, setIsSuccess] = useState(false); // 通關狀態
+  const [isSuccess, setIsSuccess] = useState(false);
   
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // 1. 隨時檢查通關條件
   useEffect(() => {
     let pass = true;
     let hasRequired = false;
@@ -24,12 +23,8 @@ export default function GameBoard({ level }: { level: Level }) {
       if (slot.required) {
         hasRequired = true;
         const placedCharId = placed[slot.id];
-        
-        // 條件一：格子要有站人
         if (!placedCharId) { pass = false; break; }
-        // 條件二：角色要是對的
         if (!slot.allowedCharacterIds.includes(placedCharId)) { pass = false; break; }
-        // 條件三：姿勢要是對的
         if (slot.allowedPoseIds && slot.allowedPoseIds.length > 0) {
           const currentPose = poses[slot.id] || 'stand';
           if (!slot.allowedPoseIds.includes(currentPose)) { pass = false; break; }
@@ -37,12 +32,19 @@ export default function GameBoard({ level }: { level: Level }) {
       }
     }
 
-    if (pass && hasRequired) setIsSuccess(true);
-    else setIsSuccess(false);
+    if (pass && hasRequired) {
+      setIsSuccess(true);
+      // 🔥 核心新增：通關瞬間，寫入 localStorage 存檔
+      const saved = JSON.parse(localStorage.getItem('gami_progress') || '{}');
+      saved[level.id] = true;
+      localStorage.setItem('gami_progress', JSON.stringify(saved));
+    } else {
+      setIsSuccess(false);
+    }
   }, [placed, poses, level]);
 
   const handlePointerDown = (e: React.PointerEvent, charId: string, fromSlot: string | null) => {
-    if (isSuccess) return; // 通關後鎖定畫面
+    if (isSuccess) return;
     const target = e.target as HTMLElement;
     target.setPointerCapture(e.pointerId);
     setDragging({ id: charId, fromSlot });
@@ -60,12 +62,10 @@ export default function GameBoard({ level }: { level: Level }) {
     const target = e.target as HTMLElement;
     target.releasePointerCapture(e.pointerId);
 
-    // 判斷是點擊還是拖曳 (移動距離小於 5px 視為點擊)
     const dx = e.clientX - dragStartPos.x;
     const dy = e.clientY - dragStartPos.y;
     const isTap = Math.abs(dx) < 5 && Math.abs(dy) < 5;
 
-    // 如果是點擊已經在畫面上的人，就切換姿勢
     if (isTap && dragging.fromSlot) {
       const charData = characters.find(c => c.id === dragging.id);
       if (charData && charData.poses.length > 1) {
@@ -95,8 +95,6 @@ export default function GameBoard({ level }: { level: Level }) {
 
       if (droppedSlot) {
         setPlaced(prev => ({ ...prev, [droppedSlot]: dragging.id }));
-        
-        // 處理姿勢移轉或給予預設姿勢
         if (!dragging.fromSlot) {
           const charData = characters.find(c => c.id === dragging.id);
           setPoses(prev => ({ ...prev, [droppedSlot]: charData?.defaultPoseId || 'stand' }));
@@ -109,7 +107,6 @@ export default function GameBoard({ level }: { level: Level }) {
           });
         }
       } else if (dragging.fromSlot) {
-        // 退回待命區，清除狀態
         const newPlaced = { ...placed };
         delete newPlaced[dragging.fromSlot];
         setPlaced(newPlaced);
@@ -123,14 +120,11 @@ export default function GameBoard({ level }: { level: Level }) {
   };
 
   const placedChars = Object.values(placed);
-  
-  // 取得角色顯示名稱 (包含當前姿勢)
   const getCharDisplayName = (id: string, poseId: string = 'stand') => {
     const charData = characters.find(c => c.id === id);
     const poseName = charData?.poses.find(p => p.id === poseId)?.name || '未知';
     return `${charData?.name || id}\n(${poseName})`;
   };
-  
   const getCharColor = (id: string) => id === 'fangfang' ? 'bg-blue-500' : id === 'jianjian' ? 'bg-red-500' : 'bg-green-500';
 
   return (
@@ -147,7 +141,7 @@ export default function GameBoard({ level }: { level: Level }) {
       </div>
 
       <div ref={boardRef} className="flex-1 relative bg-slate-950 flex items-center justify-center p-2 overflow-hidden">
-         <div className="w-[335px] h-[430px] max-h-full max-w-full aspect-[335/430] border-2 border-slate-700 rounded-2xl relative bg-slate-800/50 shadow-inner scale-95 origin-center">
+         <div className="w-[335px] h-[430px] max-h-full max-w-full aspect-[335/430] border-2 border-slate-700 rounded-2xl relative bg-slate-800/50 shadow-inner scale-95 origin-center transition-all">
             {level.slots.map(slot => {
               const isPlaced = placed[slot.id];
               const isDraggingThis = dragging?.id === isPlaced && dragging?.fromSlot === slot.id;
@@ -181,7 +175,7 @@ export default function GameBoard({ level }: { level: Level }) {
       </div>
 
       <div className="bg-slate-800 border-t border-slate-700 p-3 min-h-[100px] z-10 shrink-0 pb-6">
-        <div className="text-xs text-slate-400 mb-2">待命角色區 (按住拖曳)：</div>
+        <div className="text-xs text-slate-400 mb-2">待命角色區 (按住拖曳，輕點換姿勢)：</div>
         <div className="flex gap-2 overflow-x-auto pb-1 px-1">
           {level.characters.map((charId) => {
             const isPlaced = placedChars.includes(charId);
@@ -202,11 +196,11 @@ export default function GameBoard({ level }: { level: Level }) {
         </div>
       </div>
 
-      {/* 通關成功提示框 */}
       {isSuccess && (
         <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-slate-800 p-8 rounded-3xl border border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.3)] text-center max-w-[80%]">
-            <h2 className="text-3xl font-black text-yellow-400 mb-4 animate-bounce">打卡成功！</h2>
+            <div className="text-5xl mb-4">🎉</div>
+            <h2 className="text-3xl font-black text-yellow-400 mb-4">打卡成功！</h2>
             <p className="text-slate-200 mb-8 leading-relaxed">{level.successMessage}</p>
             <Link href="/levels" className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95">
               回關卡選擇
