@@ -1,12 +1,12 @@
-﻿import Link from 'next/link';
-import { levels } from '@/data/levels'; //
+import Link from 'next/link';
+import { levels } from '@/data/levels';
 
 export default function LevelsPage() {
   return (
     <div className="flex flex-col h-full p-4 select-none">
       <div className="flex items-center justify-between my-4">
-        <h2 className="text-2xl font-bold text-yellow-400">??豢?</h2>
-        <Link href="/" className="text-sm text-slate-400 hover:text-white">????/Link>
+        <h2 className="text-2xl font-bold text-yellow-400">關卡選擇</h2>
+        <Link href="/" className="text-sm text-slate-400 hover:text-white">回首頁</Link>
       </div>
 
       <div className="grid grid-cols-1 gap-3 overflow-y-auto pr-1 flex-1 pb-6">
@@ -17,10 +17,10 @@ export default function LevelsPage() {
               <span className="text-lg font-bold">{level.title}</span>
               <span className="text-xs text-slate-400 mt-1">{level.subtitle}</span>
             </div>
-            <span className="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full">?芸???/span>
+            <span className="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full">未完成</span>
           </Link>
         ))}
       </div>
     </div>
   );
-} //
+}
