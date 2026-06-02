@@ -17,15 +17,38 @@ export default function GameBoard({ level }: { level: Level }) {
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   
+  // 🔥 新增：狀態管理
+  const [muted, setMuted] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  
   const boardRef = useRef<HTMLDivElement>(null);
+
+  // 初始化：檢查靜音與教學狀態
+  useEffect(() => {
+    setMuted(localStorage.getItem('gami_muted') === 'true');
+    if (level.id === 'level-01' && !localStorage.getItem('gami_tutorial')) {
+      setShowTutorial(true);
+    }
+  }, [level.id]);
+
+  const toggleMute = () => {
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    localStorage.setItem('gami_muted', String(nextMuted));
+  };
+
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    localStorage.setItem('gami_tutorial', 'true');
+  };
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isTimerRunning && !isSuccess) {
+    if (isTimerRunning && !isSuccess && !showTutorial) {
       timer = setInterval(() => setTimeElapsed(prev => prev + 1), 1000);
     }
     return () => clearInterval(timer);
-  }, [isTimerRunning, isSuccess]);
+  }, [isTimerRunning, isSuccess, showTutorial]);
 
   useEffect(() => {
     let pass = true;
@@ -48,14 +71,11 @@ export default function GameBoard({ level }: { level: Level }) {
       if (!isSuccess) {
         setIsSuccess(true);
         setIsTimerRunning(false);
-        playWin(); // 🔥 播放通關勝利音效
+        playWin();
         
         const saved = JSON.parse(localStorage.getItem('gami_progress') || '{}');
         const prevData = saved[level.id] || { passed: false, bestTime: 999 };
-        saved[level.id] = {
-          passed: true,
-          bestTime: Math.min(prevData.bestTime, timeElapsed)
-        };
+        saved[level.id] = { passed: true, bestTime: Math.min(prevData.bestTime, timeElapsed) };
         localStorage.setItem('gami_progress', JSON.stringify(saved));
       }
     } else {
@@ -64,12 +84,10 @@ export default function GameBoard({ level }: { level: Level }) {
   }, [placed, poses, level, timeElapsed, isSuccess]);
 
   const handlePointerDown = (e: React.PointerEvent, charId: string, fromSlot: string | null) => {
-    if (isSuccess) return;
-    
+    if (isSuccess || showTutorial) return;
     if (!isTimerRunning && moves === 0) setIsTimerRunning(true);
     
-    playPop(); // 🔥 播放抓取音效
-
+    playPop();
     const target = e.target as HTMLElement;
     target.setPointerCapture(e.pointerId);
     setDragging({ id: charId, fromSlot });
@@ -100,7 +118,7 @@ export default function GameBoard({ level }: { level: Level }) {
         const currentIndex = charData.poses.findIndex(p => p.id === currentPose);
         const nextPose = charData.poses[(currentIndex + 1) % charData.poses.length].id;
         setPoses(prev => ({ ...prev, [dragging.fromSlot!]: nextPose }));
-        playSnap(); // 🔥 點擊換姿勢也播放喀聲
+        playSnap();
       }
       setDragging(null);
       return;
@@ -123,7 +141,7 @@ export default function GameBoard({ level }: { level: Level }) {
 
       if (droppedSlot) {
         setPlaced(prev => ({ ...prev, [droppedSlot]: dragging.id }));
-        playSnap(); // 🔥 成功吸附播放喀聲與震動
+        playSnap();
 
         if (!dragging.fromSlot) {
           const charData = characters.find(c => c.id === dragging.id);
@@ -203,6 +221,7 @@ export default function GameBoard({ level }: { level: Level }) {
          onPointerMove={handlePointerMove}
          onPointerUp={handlePointerUp}>
       
+      {/* 頂部導覽 */}
       <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center z-10 shrink-0 shadow-md">
         <div>
           <h3 className="font-bold text-lg text-yellow-400 drop-shadow-sm">{level.title}</h3>
@@ -211,7 +230,13 @@ export default function GameBoard({ level }: { level: Level }) {
             <span>👣 {moves} 步</span>
           </div>
         </div>
-        <Link href="/levels" className="bg-slate-700 text-xs px-3 py-1.5 rounded-lg hover:bg-slate-600 text-white border border-slate-600">放棄</Link>
+        <div className="flex items-center gap-2">
+          {/* 靜音切換按鈕 */}
+          <button onClick={toggleMute} className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-lg active:scale-90 transition-transform">
+            {muted ? '🔇' : '🔊'}
+          </button>
+          <Link href="/levels" className="bg-slate-700 text-xs px-3 py-1.5 rounded-lg hover:bg-slate-600 text-white border border-slate-600">放棄</Link>
+        </div>
       </div>
 
       <div ref={boardRef} className="flex-1 relative bg-slate-950 flex items-center justify-center p-2 overflow-hidden">
@@ -263,6 +288,29 @@ export default function GameBoard({ level }: { level: Level }) {
           })}
         </div>
       </div>
+
+      {/* 🔥 新增：首次遊玩的新手引導 */}
+      {showTutorial && (
+        <div className="absolute inset-0 z-[60] bg-slate-900/90 flex flex-col items-center justify-center backdrop-blur-sm px-6 text-center" onClick={closeTutorial}>
+          <div className="w-24 h-24 bg-blue-500 rounded-2xl flex items-center justify-center text-4xl mb-6 shadow-[0_0_30px_rgba(59,130,246,0.5)] animate-bounce">
+            👽
+          </div>
+          <h2 className="text-2xl font-black text-white mb-4">歡迎來到角面星人打卡</h2>
+          <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 text-left space-y-4 shadow-xl mb-8 w-full max-w-sm">
+            <p className="flex items-center gap-3 text-slate-200">
+              <span className="text-2xl">👆</span> 
+              <span>按住下方角色，<b>拖曳</b>到畫面上的虛線框內。</span>
+            </p>
+            <p className="flex items-center gap-3 text-slate-200">
+              <span className="text-2xl">🔄</span> 
+              <span>放在畫面上後，<b>輕點角色</b>可以切換姿勢。</span>
+            </p>
+          </div>
+          <button className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-4 px-12 rounded-full text-lg shadow-[0_4px_15px_rgba(234,179,8,0.4)] transition-transform active:scale-95 animate-pulse">
+            我知道了！
+          </button>
+        </div>
+      )}
 
       {isSuccess && (
         <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">

@@ -1,4 +1,3 @@
-// 使用 Web Audio API 動態合成音效，免載 MP3
 let audioCtx: AudioContext | null = null;
 
 const initAudio = () => {
@@ -10,7 +9,15 @@ const initAudio = () => {
   }
 };
 
+const isMuted = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('gami_muted') === 'true';
+  }
+  return false;
+};
+
 export const playPop = () => {
+  if (isMuted()) return;
   try {
     initAudio();
     if (!audioCtx) return;
@@ -29,6 +36,7 @@ export const playPop = () => {
 };
 
 export const playSnap = () => {
+  if (isMuted()) return;
   try {
     initAudio();
     if (!audioCtx) return;
@@ -44,17 +52,20 @@ export const playSnap = () => {
     osc.start();
     osc.stop(audioCtx.currentTime + 0.1);
     
-    // 觸發手機震動 (如果支援)
     if (navigator.vibrate) navigator.vibrate(20);
   } catch (e) { console.warn(e); }
 };
 
 export const playWin = () => {
+  if (isMuted()) {
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+    return;
+  }
   try {
     initAudio();
     if (!audioCtx) return;
     const time = audioCtx.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C E G C (勝利和弦)
+    const notes = [523.25, 659.25, 783.99, 1046.50];
     
     notes.forEach((freq, index) => {
       const osc = audioCtx.createOscillator();
