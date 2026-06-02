@@ -16,14 +16,11 @@ export default function GameBoard({ level }: { level: Level }) {
   const [moves, setMoves] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  
-  // 🔥 新增：狀態管理
   const [muted, setMuted] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // 初始化：檢查靜音與教學狀態
   useEffect(() => {
     setMuted(localStorage.getItem('gami_muted') === 'true');
     if (level.id === 'level-01' && !localStorage.getItem('gami_tutorial')) {
@@ -72,7 +69,6 @@ export default function GameBoard({ level }: { level: Level }) {
         setIsSuccess(true);
         setIsTimerRunning(false);
         playWin();
-        
         const saved = JSON.parse(localStorage.getItem('gami_progress') || '{}');
         const prevData = saved[level.id] || { passed: false, bestTime: 999 };
         saved[level.id] = { passed: true, bestTime: Math.min(prevData.bestTime, timeElapsed) };
@@ -142,7 +138,6 @@ export default function GameBoard({ level }: { level: Level }) {
       if (droppedSlot) {
         setPlaced(prev => ({ ...prev, [droppedSlot]: dragging.id }));
         playSnap();
-
         if (!dragging.fromSlot) {
           const charData = characters.find(c => c.id === dragging.id);
           setPoses(prev => ({ ...prev, [droppedSlot]: charData?.defaultPoseId || 'stand' }));
@@ -196,21 +191,42 @@ export default function GameBoard({ level }: { level: Level }) {
   };
   const getCharColor = (id: string) => id === 'fangfang' ? 'bg-blue-500' : id === 'jianjian' ? 'bg-red-500' : id === 'aogao' ? 'bg-green-500' : 'bg-pink-500';
 
+  // 🔥 核心更新：加入純 CSS 的形狀模擬器
   const CharacterAvatar = ({ id, poseId, isDragging, onDown }: { id: string, poseId: string, isDragging?: boolean, onDown?: (e: React.PointerEvent) => void }) => {
+    const charData = characters.find(c => c.id === id);
     const imgSrc = getCharImage(id, poseId);
     const colorClass = getCharColor(id);
-    const charName = characters.find(c => c.id === id)?.name || id;
+    const charName = charData?.name || id;
+    const faceShape = charData?.faceShape || 'square';
+    const poseName = charData?.poses.find(p => p.id === poseId)?.name || '未知';
+
+    // 依照設定的 faceShape 給予對應的 CSS 形狀
+    let shapeStyle = "w-10 h-10 ";
+    if (faceShape === 'square') shapeStyle += "rounded-md";
+    else if (faceShape === 'circle') shapeStyle += "rounded-full";
+    else if (faceShape === 'triangle') shapeStyle += "[clip-path:polygon(50%_0%,0%_100%,100%_100%)]";
+    else if (faceShape === 'concave') shapeStyle += "[clip-path:polygon(0%_0%,25%_0%,25%_55%,75%_55%,75%_0%,100%_0%,100%_100%,0%_100%)]";
+    else if (faceShape === 'long') shapeStyle = "w-6 h-12 rounded-sm";
+
+    // 當切換為「蹲下」姿勢時，讓形狀稍微變扁
+    if (poseId === 'squat') shapeStyle += " scale-y-75 translate-y-2";
 
     return (
       <div onPointerDown={onDown}
-           className={`w-16 h-16 rounded-xl flex items-center justify-center font-bold shadow-lg cursor-grab active:scale-95 transition-transform overflow-hidden relative group border-2 border-white/20 ${colorClass} ${isDragging ? 'opacity-50' : ''}`}>
-        <img src={imgSrc} alt={charName} 
+           className={`w-16 h-16 rounded-xl flex flex-col items-center justify-center font-bold shadow-lg cursor-grab active:scale-95 transition-transform overflow-hidden relative group border border-slate-600 bg-slate-800 ${isDragging ? 'opacity-50' : ''}`}>
+        
+        {/* CSS 幾何圖形 (圖層放在最下面) */}
+        <div className={`${shapeStyle} ${colorClass} absolute top-1 shadow-inner opacity-90 transition-all duration-200`}></div>
+        
+        {/* 如果找不到真實圖片，會自動隱藏，露出底下的 CSS 幾何圖形 */}
+        <img src={imgSrc || '/placeholder.png'} alt={charName} 
              className="w-full h-full object-cover absolute inset-0 z-10 scale-110 drop-shadow-md"
              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-        <span className="text-white text-xs z-0 whitespace-pre-line text-center leading-tight">
+        
+        <span className="text-white text-[10px] z-20 whitespace-pre-line text-center leading-none absolute bottom-[2px] drop-shadow-[0_1px_3px_rgba(0,0,0,1)] font-black tracking-wide">
           {charName}
           <br/>
-          <span className="text-[10px] opacity-80">({characters.find(c => c.id === id)?.poses.find(p => p.id === poseId)?.name})</span>
+          <span className="text-[8px] opacity-90">({poseName})</span>
         </span>
       </div>
     );
@@ -221,7 +237,6 @@ export default function GameBoard({ level }: { level: Level }) {
          onPointerMove={handlePointerMove}
          onPointerUp={handlePointerUp}>
       
-      {/* 頂部導覽 */}
       <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center z-10 shrink-0 shadow-md">
         <div>
           <h3 className="font-bold text-lg text-yellow-400 drop-shadow-sm">{level.title}</h3>
@@ -231,7 +246,6 @@ export default function GameBoard({ level }: { level: Level }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* 靜音切換按鈕 */}
           <button onClick={toggleMute} className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-lg active:scale-90 transition-transform">
             {muted ? '🔇' : '🔊'}
           </button>
@@ -289,7 +303,6 @@ export default function GameBoard({ level }: { level: Level }) {
         </div>
       </div>
 
-      {/* 🔥 新增：首次遊玩的新手引導 */}
       {showTutorial && (
         <div className="absolute inset-0 z-[60] bg-slate-900/90 flex flex-col items-center justify-center backdrop-blur-sm px-6 text-center" onClick={closeTutorial}>
           <div className="w-24 h-24 bg-blue-500 rounded-2xl flex items-center justify-center text-4xl mb-6 shadow-[0_0_30px_rgba(59,130,246,0.5)] animate-bounce">

@@ -6,6 +6,16 @@ import { characters } from '@/data/characters';
 export default function CharactersPage() {
   const getCharColor = (id: string) => id === 'fangfang' ? 'bg-blue-500' : id === 'jianjian' ? 'bg-red-500' : id === 'aogao' ? 'bg-green-500' : id === 'yuanyuan' ? 'bg-pink-500' : 'bg-purple-500';
 
+  const getShapeStyle = (faceShape: string, sizeClass: string = "w-12 h-12", extraClass: string = "") => {
+    let style = `${sizeClass} ${extraClass} `;
+    if (faceShape === 'square') style += "rounded-lg";
+    else if (faceShape === 'circle') style += "rounded-full";
+    else if (faceShape === 'triangle') style += "[clip-path:polygon(50%_0%,0%_100%,100%_100%)]";
+    else if (faceShape === 'concave') style += "[clip-path:polygon(0%_0%,25%_0%,25%_55%,75%_55%,75%_0%,100%_0%,100%_100%,0%_100%)]";
+    else if (faceShape === 'long') style += "scale-x-50 rounded-md";
+    return style;
+  };
+
   return (
     <div className="flex flex-col h-[100dvh] p-4 select-none overflow-hidden bg-slate-900">
       <div className="flex items-center justify-between my-4 shrink-0 px-2">
@@ -18,11 +28,13 @@ export default function CharactersPage() {
           <div key={char.id} className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
             <div className="flex p-4 gap-4 items-center border-b border-slate-700/50 bg-slate-800/80">
               
-              <div className={`w-24 h-24 rounded-2xl ${getCharColor(char.id)} flex items-center justify-center text-white font-black text-xl shadow-inner shrink-0 border-4 border-slate-700 relative overflow-hidden`}>
-                <img src={char.poses[0]?.imageSrc} alt={char.name} 
+              <div className="w-24 h-24 rounded-2xl bg-slate-900 flex items-center justify-center shadow-inner shrink-0 border-4 border-slate-700 relative overflow-hidden">
+                {/* CSS 幾何大頭貼 */}
+                <div className={`${getShapeStyle(char.faceShape, "w-14 h-14")} ${getCharColor(char.id)} absolute shadow-inner opacity-90`}></div>
+                <img src={char.poses[0]?.imageSrc || '/placeholder.png'} alt={char.name} 
                      className="w-full h-full object-cover absolute inset-0 z-10"
                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-                <span className="z-0 opacity-80">{char.name}</span>
+                <span className="z-20 text-white font-black drop-shadow-[0_2px_2px_rgba(0,0,0,1)] absolute bottom-1">{char.name}</span>
               </div>
               
               <div className="flex flex-col flex-1">
@@ -39,11 +51,13 @@ export default function CharactersPage() {
               <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
                 {char.poses.map(pose => (
                   <div key={pose.id} className="flex flex-col items-center gap-2 shrink-0">
-                    <div className={`w-16 h-16 rounded-xl ${getCharColor(char.id)} opacity-90 flex items-center justify-center text-xs font-bold text-white/90 border-2 border-slate-700 shadow-md relative overflow-hidden`}>
-                      <img src={pose.imageSrc} alt={pose.name} 
+                    <div className="w-16 h-16 rounded-xl bg-slate-800 flex flex-col items-center justify-center border-2 border-slate-700 shadow-md relative overflow-hidden">
+                      {/* 小尺寸 CSS 姿勢預覽 */}
+                      <div className={`${getShapeStyle(char.faceShape, "w-8 h-8", pose.id === 'squat' ? 'scale-y-75 translate-y-1' : '')} ${getCharColor(char.id)} absolute top-2 opacity-90`}></div>
+                      <img src={pose.imageSrc || '/placeholder.png'} alt={pose.name} 
                            className="w-full h-full object-cover absolute inset-0 z-10"
                            onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-                      <span className="z-0 whitespace-pre-line text-center">{pose.name}</span>
+                      <span className="z-20 text-[10px] text-white font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,1)] absolute bottom-1">{pose.name}</span>
                     </div>
                   </div>
                 ))}
