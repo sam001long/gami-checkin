@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Level } from '@/types/game';
 import { characters } from '@/data/characters';
+import { playPop, playSnap, playWin } from '@/utils/audio';
 
 export default function GameBoard({ level }: { level: Level }) {
   const [placed, setPlaced] = useState<Record<string, string>>({});
@@ -12,15 +13,12 @@ export default function GameBoard({ level }: { level: Level }) {
   const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [isSuccess, setIsSuccess] = useState(false);
-  
-  // 🔥 新增：挑戰系統狀態
   const [moves, setMoves] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // 🔥 計時器邏輯
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isTimerRunning && !isSuccess) {
@@ -29,7 +27,6 @@ export default function GameBoard({ level }: { level: Level }) {
     return () => clearInterval(timer);
   }, [isTimerRunning, isSuccess]);
 
-  // 通關判定
   useEffect(() => {
     let pass = true;
     let hasRequired = false;
@@ -48,28 +45,31 @@ export default function GameBoard({ level }: { level: Level }) {
     }
 
     if (pass && hasRequired) {
-      setIsSuccess(true);
-      setIsTimerRunning(false); // 停止計時
-      
-      const saved = JSON.parse(localStorage.getItem('gami_progress') || '{}');
-      // 升級存檔結構，記錄最佳成績
-      const prevData = saved[level.id] || { passed: false, bestTime: 999 };
-      saved[level.id] = {
-        passed: true,
-        bestTime: Math.min(prevData.bestTime, timeElapsed)
-      };
-      localStorage.setItem('gami_progress', JSON.stringify(saved));
+      if (!isSuccess) {
+        setIsSuccess(true);
+        setIsTimerRunning(false);
+        playWin(); // 🔥 播放通關勝利音效
+        
+        const saved = JSON.parse(localStorage.getItem('gami_progress') || '{}');
+        const prevData = saved[level.id] || { passed: false, bestTime: 999 };
+        saved[level.id] = {
+          passed: true,
+          bestTime: Math.min(prevData.bestTime, timeElapsed)
+        };
+        localStorage.setItem('gami_progress', JSON.stringify(saved));
+      }
     } else {
       setIsSuccess(false);
     }
-  }, [placed, poses, level, timeElapsed]);
+  }, [placed, poses, level, timeElapsed, isSuccess]);
 
   const handlePointerDown = (e: React.PointerEvent, charId: string, fromSlot: string | null) => {
     if (isSuccess) return;
     
-    // 第一次碰到角色時開始計時
     if (!isTimerRunning && moves === 0) setIsTimerRunning(true);
     
+    playPop(); // 🔥 播放抓取音效
+
     const target = e.target as HTMLElement;
     target.setPointerCapture(e.pointerId);
     setDragging({ id: charId, fromSlot });
@@ -91,7 +91,6 @@ export default function GameBoard({ level }: { level: Level }) {
     const dy = e.clientY - dragStartPos.y;
     const isTap = Math.abs(dx) < 5 && Math.abs(dy) < 5;
 
-    // 只要有放開，移動次數就 +1
     setMoves(prev => prev + 1);
 
     if (isTap && dragging.fromSlot) {
@@ -101,6 +100,7 @@ export default function GameBoard({ level }: { level: Level }) {
         const currentIndex = charData.poses.findIndex(p => p.id === currentPose);
         const nextPose = charData.poses[(currentIndex + 1) % charData.poses.length].id;
         setPoses(prev => ({ ...prev, [dragging.fromSlot!]: nextPose }));
+        playSnap(); // 🔥 點擊換姿勢也播放喀聲
       }
       setDragging(null);
       return;
@@ -123,6 +123,8 @@ export default function GameBoard({ level }: { level: Level }) {
 
       if (droppedSlot) {
         setPlaced(prev => ({ ...prev, [droppedSlot]: dragging.id }));
+        playSnap(); // 🔥 成功吸附播放喀聲與震動
+
         if (!dragging.fromSlot) {
           const charData = characters.find(c => c.id === dragging.id);
           setPoses(prev => ({ ...prev, [droppedSlot]: charData?.defaultPoseId || 'stand' }));
@@ -163,7 +165,6 @@ export default function GameBoard({ level }: { level: Level }) {
     }
   };
 
-  // 格式化時間 (mm:ss)
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
@@ -171,7 +172,6 @@ export default function GameBoard({ level }: { level: Level }) {
   };
 
   const placedChars = Object.values(placed);
-  
   const getCharImage = (id: string, poseId: string = 'stand') => {
     const charData = characters.find(c => c.id === id);
     return charData?.poses.find(p => p.id === poseId)?.imageSrc;
@@ -203,7 +203,6 @@ export default function GameBoard({ level }: { level: Level }) {
          onPointerMove={handlePointerMove}
          onPointerUp={handlePointerUp}>
       
-      {/* 頂部導覽列加入挑戰數據 */}
       <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center z-10 shrink-0 shadow-md">
         <div>
           <h3 className="font-bold text-lg text-yellow-400 drop-shadow-sm">{level.title}</h3>
@@ -271,7 +270,6 @@ export default function GameBoard({ level }: { level: Level }) {
             <div className="text-5xl mb-4 animate-bounce">🎉</div>
             <h2 className="text-3xl font-black text-yellow-400 mb-2 drop-shadow-md">打卡成功！</h2>
             
-            {/* 戰績展示區塊 */}
             <div className="bg-slate-900/80 rounded-xl p-4 mb-4 border border-slate-700">
                <div className="flex justify-around text-slate-300">
                  <div className="flex flex-col items-center">
