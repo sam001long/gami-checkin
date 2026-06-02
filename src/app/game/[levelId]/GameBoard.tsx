@@ -19,6 +19,9 @@ export default function GameBoard({ level }: { level: Level }) {
   const [muted, setMuted] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   
+  // 🔥 新增：紀錄本次獲得的星星數量
+  const [earnedStars, setEarnedStars] = useState(0);
+
   const boardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,9 +72,20 @@ export default function GameBoard({ level }: { level: Level }) {
         setIsSuccess(true);
         setIsTimerRunning(false);
         playWin();
+        
+        // 計算星星
+        let stars = 1;
+        if (timeElapsed <= level.starThresholds.threeStarsTime) stars = 3;
+        else if (timeElapsed <= level.starThresholds.twoStarsTime) stars = 2;
+        setEarnedStars(stars);
+        
         const saved = JSON.parse(localStorage.getItem('gami_progress') || '{}');
-        const prevData = saved[level.id] || { passed: false, bestTime: 999 };
-        saved[level.id] = { passed: true, bestTime: Math.min(prevData.bestTime, timeElapsed) };
+        const prevData = saved[level.id] || { passed: false, bestTime: 999, stars: 0 };
+        saved[level.id] = { 
+          passed: true, 
+          bestTime: Math.min(prevData.bestTime, timeElapsed),
+          stars: Math.max(prevData.stars, stars) // 保留歷史最高星數
+        };
         localStorage.setItem('gami_progress', JSON.stringify(saved));
       }
     } else {
@@ -162,12 +176,13 @@ export default function GameBoard({ level }: { level: Level }) {
   };
 
   const handleShare = () => {
+    let starStr = '★'.repeat(earnedStars) + '☆'.repeat(3 - earnedStars);
     // @ts-ignore
     if (window.liff && window.liff.isApiAvailable('shareTargetPicker')) {
       // @ts-ignore
       window.liff.shareTargetPicker([{
         type: "text",
-        text: `【${level.title}】打卡成功！\n我花了 ${timeElapsed} 秒，移動 ${moves} 步才喬好這群外星人🤣\n你能比我快嗎？來挑戰看看：\nhttps://liff.line.me/2010251224-ecBZ1NJR`
+        text: `【${level.title}】打卡成功！獲得評價 [${starStr}]\n我花了 ${timeElapsed} 秒，移動 ${moves} 步🤣\n你能拿到三星嗎？來挑戰看看：\nhttps://liff.line.me/2010251224-ecBZ1NJR`
       }]).then((res: any) => {
         if (res) alert("已成功發送戰績給好友！");
       }).catch((error: any) => {
@@ -191,7 +206,16 @@ export default function GameBoard({ level }: { level: Level }) {
   };
   const getCharColor = (id: string) => id === 'fangfang' ? 'bg-blue-500' : id === 'jianjian' ? 'bg-red-500' : id === 'aogao' ? 'bg-green-500' : 'bg-pink-500';
 
-  // 🔥 核心更新：加入純 CSS 的形狀模擬器
+  const getShapeStyle = (faceShape: string, sizeClass: string = "w-10 h-10", extraClass: string = "") => {
+    let style = `${sizeClass} ${extraClass} `;
+    if (faceShape === 'square') style += "rounded-md";
+    else if (faceShape === 'circle') style += "rounded-full";
+    else if (faceShape === 'triangle') style += "[clip-path:polygon(50%_0%,0%_100%,100%_100%)]";
+    else if (faceShape === 'concave') style += "[clip-path:polygon(0%_0%,25%_0%,25%_55%,75%_55%,75%_0%,100%_0%,100%_100%,0%_100%)]";
+    else if (faceShape === 'long') style = "w-6 h-12 rounded-sm";
+    return style;
+  };
+
   const CharacterAvatar = ({ id, poseId, isDragging, onDown }: { id: string, poseId: string, isDragging?: boolean, onDown?: (e: React.PointerEvent) => void }) => {
     const charData = characters.find(c => c.id === id);
     const imgSrc = getCharImage(id, poseId);
@@ -200,29 +224,13 @@ export default function GameBoard({ level }: { level: Level }) {
     const faceShape = charData?.faceShape || 'square';
     const poseName = charData?.poses.find(p => p.id === poseId)?.name || '未知';
 
-    // 依照設定的 faceShape 給予對應的 CSS 形狀
-    let shapeStyle = "w-10 h-10 ";
-    if (faceShape === 'square') shapeStyle += "rounded-md";
-    else if (faceShape === 'circle') shapeStyle += "rounded-full";
-    else if (faceShape === 'triangle') shapeStyle += "[clip-path:polygon(50%_0%,0%_100%,100%_100%)]";
-    else if (faceShape === 'concave') shapeStyle += "[clip-path:polygon(0%_0%,25%_0%,25%_55%,75%_55%,75%_0%,100%_0%,100%_100%,0%_100%)]";
-    else if (faceShape === 'long') shapeStyle = "w-6 h-12 rounded-sm";
-
-    // 當切換為「蹲下」姿勢時，讓形狀稍微變扁
-    if (poseId === 'squat') shapeStyle += " scale-y-75 translate-y-2";
-
     return (
       <div onPointerDown={onDown}
            className={`w-16 h-16 rounded-xl flex flex-col items-center justify-center font-bold shadow-lg cursor-grab active:scale-95 transition-transform overflow-hidden relative group border border-slate-600 bg-slate-800 ${isDragging ? 'opacity-50' : ''}`}>
-        
-        {/* CSS 幾何圖形 (圖層放在最下面) */}
-        <div className={`${shapeStyle} ${colorClass} absolute top-1 shadow-inner opacity-90 transition-all duration-200`}></div>
-        
-        {/* 如果找不到真實圖片，會自動隱藏，露出底下的 CSS 幾何圖形 */}
+        <div className={`${getShapeStyle(faceShape, "w-10 h-10", poseId === 'squat' ? 'scale-y-75 translate-y-2' : '')} ${colorClass} absolute top-1 shadow-inner opacity-90 transition-all duration-200`}></div>
         <img src={imgSrc || '/placeholder.png'} alt={charName} 
              className="w-full h-full object-cover absolute inset-0 z-10 scale-110 drop-shadow-md"
              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-        
         <span className="text-white text-[10px] z-20 whitespace-pre-line text-center leading-none absolute bottom-[2px] drop-shadow-[0_1px_3px_rgba(0,0,0,1)] font-black tracking-wide">
           {charName}
           <br/>
@@ -285,7 +293,11 @@ export default function GameBoard({ level }: { level: Level }) {
       </div>
 
       <div className="bg-slate-800 border-t border-slate-700 p-3 min-h-[100px] z-10 shrink-0 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.3)]">
-        <div className="text-xs text-slate-400 mb-2 font-medium">待命角色區 <span className="text-yellow-500">(按住拖曳，輕點換姿勢)</span>：</div>
+        <div className="text-xs text-slate-400 mb-2 font-medium flex justify-between">
+          <span>待命角色區 <span className="text-yellow-500">(按住拖曳，輕點換姿勢)</span></span>
+          {/* 提示三星門檻 */}
+          <span className="text-slate-500">🏆 3星: &lt;{level.starThresholds.threeStarsTime}s</span>
+        </div>
         <div className="flex gap-3 overflow-x-auto pb-1 px-1 custom-scrollbar">
           {level.characters.map((charId) => {
             const isPlaced = placedChars.includes(charId);
@@ -305,9 +317,7 @@ export default function GameBoard({ level }: { level: Level }) {
 
       {showTutorial && (
         <div className="absolute inset-0 z-[60] bg-slate-900/90 flex flex-col items-center justify-center backdrop-blur-sm px-6 text-center" onClick={closeTutorial}>
-          <div className="w-24 h-24 bg-blue-500 rounded-2xl flex items-center justify-center text-4xl mb-6 shadow-[0_0_30px_rgba(59,130,246,0.5)] animate-bounce">
-            👽
-          </div>
+          <div className="w-24 h-24 bg-blue-500 rounded-2xl flex items-center justify-center text-4xl mb-6 shadow-[0_0_30px_rgba(59,130,246,0.5)] animate-bounce">👽</div>
           <h2 className="text-2xl font-black text-white mb-4">歡迎來到角面星人打卡</h2>
           <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 text-left space-y-4 shadow-xl mb-8 w-full max-w-sm">
             <p className="flex items-center gap-3 text-slate-200">
@@ -319,17 +329,26 @@ export default function GameBoard({ level }: { level: Level }) {
               <span>放在畫面上後，<b>輕點角色</b>可以切換姿勢。</span>
             </p>
           </div>
-          <button className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-4 px-12 rounded-full text-lg shadow-[0_4px_15px_rgba(234,179,8,0.4)] transition-transform active:scale-95 animate-pulse">
-            我知道了！
-          </button>
+          <button className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-4 px-12 rounded-full text-lg shadow-[0_4px_15px_rgba(234,179,8,0.4)] transition-transform active:scale-95 animate-pulse">我知道了！</button>
         </div>
       )}
 
       {isSuccess && (
         <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-slate-800 p-8 rounded-3xl border border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.3)] text-center max-w-[80%]">
-            <div className="text-5xl mb-4 animate-bounce">🎉</div>
-            <h2 className="text-3xl font-black text-yellow-400 mb-2 drop-shadow-md">打卡成功！</h2>
+          <div className="bg-slate-800 p-8 rounded-3xl border border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.3)] text-center max-w-[80%] relative overflow-hidden">
+            
+            {/* 🔥 CSS 豪華動態星星展示 */}
+            <div className="flex justify-center gap-2 mb-6">
+              {[1, 2, 3].map((starIdx) => (
+                <div key={starIdx} 
+                     className={`text-5xl drop-shadow-[0_0_15px_rgba(234,179,8,0.8)] transition-all duration-500 ${earnedStars >= starIdx ? 'text-yellow-400 scale-100 opacity-100 animate-bounce' : 'text-slate-600 scale-75 opacity-50'}`}
+                     style={{ animationDelay: `${starIdx * 150}ms` }}>
+                  ★
+                </div>
+              ))}
+            </div>
+
+            <h2 className="text-3xl font-black text-white mb-2 drop-shadow-md">打卡成功！</h2>
             
             <div className="bg-slate-900/80 rounded-xl p-4 mb-4 border border-slate-700">
                <div className="flex justify-around text-slate-300">
@@ -346,12 +365,12 @@ export default function GameBoard({ level }: { level: Level }) {
 
             <p className="text-slate-300 mb-6 text-sm leading-relaxed font-medium">{level.successMessage}</p>
             
-            <button onClick={handleShare} className="bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2">
+            <button onClick={handleShare} className="bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2 relative z-10">
               <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 4.269 8.846 10.036 9.608.391.084.922.258 1.057.592.122.303.079.778.039 1.085l-.171 1.027c-.053.303-.242 1.186 1.039.647 1.281-.54 6.911-4.069 9.428-6.967 1.739-1.907 2.572-3.844 2.572-5.992z"/></svg>
-              向好友炫耀戰績
+              向好友炫耀三星
             </button>
             
-            <Link href="/levels" className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 border border-slate-600">
+            <Link href="/levels" className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 border border-slate-600 relative z-10">
               回關卡選擇
             </Link>
           </div>

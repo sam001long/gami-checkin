@@ -47,4 +47,8 @@ export type Level = {
   timeLimitSec?: number;
   moveLimit?: number;
   successMessage: string;
+  starThresholds: {
+    threeStarsTime: number; // 3星時間限制(秒)
+    twoStarsTime: number;   // 2星時間限制(秒)
+  };
 };

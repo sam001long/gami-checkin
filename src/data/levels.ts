@@ -14,7 +14,8 @@ export const levels: Level[] = [
       { id: 'front-center', x: 175, y: 330, row: 'front', allowedCharacterIds: ['aogao'], allowedPoseIds: ['stand'], tolerance: 36, required: true },
       { id: 'back-center', x: 175, y: 245, row: 'back', allowedCharacterIds: ['jianjian'], allowedPoseIds: ['stand'], tolerance: 36, required: true }
     ],
-    successMessage: '官方證件照完成！雖然看起來還是怪怪的。'
+    successMessage: '官方證件照完成！雖然看起來還是怪怪的。',
+    starThresholds: { threeStarsTime: 8, twoStarsTime: 15 }
   },
   { 
     id: 'level-02', 
@@ -28,7 +29,8 @@ export const levels: Level[] = [
       { id: 'slot-1', x: 80, y: 300, row: 'front', allowedCharacterIds: ['changchang'], allowedPoseIds: ['stand'], tolerance: 40, required: true },
       { id: 'slot-2', x: 250, y: 320, row: 'front', allowedCharacterIds: ['yuanyuan'], allowedPoseIds: ['stand'], tolerance: 40, required: true }
     ], 
-    successMessage: '高塔打卡成功！長長終於沒擋到風景了。' 
+    successMessage: '高塔打卡成功！長長終於沒擋到風景了。',
+    starThresholds: { threeStarsTime: 10, twoStarsTime: 20 }
   },
   {
     id: 'level-03',
@@ -43,6 +45,7 @@ export const levels: Level[] = [
       { id: 'back-left', x: 100, y: 260, row: 'back', allowedCharacterIds: ['jianjian'], allowedPoseIds: ['stand'], tolerance: 40, required: true },
       { id: 'back-right', x: 240, y: 260, row: 'back', allowedCharacterIds: ['aogao'], allowedPoseIds: ['stand'], tolerance: 40, required: true }
     ],
-    successMessage: '完美塞進車陣！方方蹲下真是太棒了。'
+    successMessage: '完美塞進車陣！方方蹲下真是太棒了。',
+    starThresholds: { threeStarsTime: 12, twoStarsTime: 25 }
   }
 ];
