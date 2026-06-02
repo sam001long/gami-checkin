@@ -13,8 +13,23 @@ export default function GameBoard({ level }: { level: Level }) {
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [isSuccess, setIsSuccess] = useState(false);
   
+  // 🔥 新增：挑戰系統狀態
+  const [moves, setMoves] = useState(0);
+  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  
   const boardRef = useRef<HTMLDivElement>(null);
 
+  // 🔥 計時器邏輯
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isTimerRunning && !isSuccess) {
+      timer = setInterval(() => setTimeElapsed(prev => prev + 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isTimerRunning, isSuccess]);
+
+  // 通關判定
   useEffect(() => {
     let pass = true;
     let hasRequired = false;
@@ -34,16 +49,27 @@ export default function GameBoard({ level }: { level: Level }) {
 
     if (pass && hasRequired) {
       setIsSuccess(true);
+      setIsTimerRunning(false); // 停止計時
+      
       const saved = JSON.parse(localStorage.getItem('gami_progress') || '{}');
-      saved[level.id] = true;
+      // 升級存檔結構，記錄最佳成績
+      const prevData = saved[level.id] || { passed: false, bestTime: 999 };
+      saved[level.id] = {
+        passed: true,
+        bestTime: Math.min(prevData.bestTime, timeElapsed)
+      };
       localStorage.setItem('gami_progress', JSON.stringify(saved));
     } else {
       setIsSuccess(false);
     }
-  }, [placed, poses, level]);
+  }, [placed, poses, level, timeElapsed]);
 
   const handlePointerDown = (e: React.PointerEvent, charId: string, fromSlot: string | null) => {
     if (isSuccess) return;
+    
+    // 第一次碰到角色時開始計時
+    if (!isTimerRunning && moves === 0) setIsTimerRunning(true);
+    
     const target = e.target as HTMLElement;
     target.setPointerCapture(e.pointerId);
     setDragging({ id: charId, fromSlot });
@@ -64,6 +90,9 @@ export default function GameBoard({ level }: { level: Level }) {
     const dx = e.clientX - dragStartPos.x;
     const dy = e.clientY - dragStartPos.y;
     const isTap = Math.abs(dx) < 5 && Math.abs(dy) < 5;
+
+    // 只要有放開，移動次數就 +1
+    setMoves(prev => prev + 1);
 
     if (isTap && dragging.fromSlot) {
       const charData = characters.find(c => c.id === dragging.id);
@@ -123,7 +152,7 @@ export default function GameBoard({ level }: { level: Level }) {
       // @ts-ignore
       window.liff.shareTargetPicker([{
         type: "text",
-        text: `我剛在《角面星人打卡》成功完成了【${level.title}】！\n這些外星人真的有夠難塞🤣\n快來挑戰看看你過不過得了：\nhttps://liff.line.me/2010251224-ecBZ1NJR`
+        text: `【${level.title}】打卡成功！\n我花了 ${timeElapsed} 秒，移動 ${moves} 步才喬好這群外星人🤣\n你能比我快嗎？來挑戰看看：\nhttps://liff.line.me/2010251224-ecBZ1NJR`
       }]).then((res: any) => {
         if (res) alert("已成功發送戰績給好友！");
       }).catch((error: any) => {
@@ -134,16 +163,21 @@ export default function GameBoard({ level }: { level: Level }) {
     }
   };
 
+  // 格式化時間 (mm:ss)
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   const placedChars = Object.values(placed);
   
-  // 🔥 新增：取得角色圖片與Fallback顏色
   const getCharImage = (id: string, poseId: string = 'stand') => {
     const charData = characters.find(c => c.id === id);
     return charData?.poses.find(p => p.id === poseId)?.imageSrc;
   };
   const getCharColor = (id: string) => id === 'fangfang' ? 'bg-blue-500' : id === 'jianjian' ? 'bg-red-500' : id === 'aogao' ? 'bg-green-500' : 'bg-pink-500';
 
-  // 渲染角色的通用組件
   const CharacterAvatar = ({ id, poseId, isDragging, onDown }: { id: string, poseId: string, isDragging?: boolean, onDown?: (e: React.PointerEvent) => void }) => {
     const imgSrc = getCharImage(id, poseId);
     const colorClass = getCharColor(id);
@@ -152,7 +186,6 @@ export default function GameBoard({ level }: { level: Level }) {
     return (
       <div onPointerDown={onDown}
            className={`w-16 h-16 rounded-xl flex items-center justify-center font-bold shadow-lg cursor-grab active:scale-95 transition-transform overflow-hidden relative group border-2 border-white/20 ${colorClass} ${isDragging ? 'opacity-50' : ''}`}>
-        {/* 如果未來放了圖片，就顯示圖片，否則顯示文字 */}
         <img src={imgSrc} alt={charName} 
              className="w-full h-full object-cover absolute inset-0 z-10 scale-110 drop-shadow-md"
              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
@@ -170,18 +203,20 @@ export default function GameBoard({ level }: { level: Level }) {
          onPointerMove={handlePointerMove}
          onPointerUp={handlePointerUp}>
       
+      {/* 頂部導覽列加入挑戰數據 */}
       <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center z-10 shrink-0 shadow-md">
         <div>
           <h3 className="font-bold text-lg text-yellow-400 drop-shadow-sm">{level.title}</h3>
-          <p className="text-xs text-slate-400">{level.subtitle}</p>
+          <div className="flex gap-3 text-xs font-mono text-cyan-300 mt-1">
+            <span>⏱ {formatTime(timeElapsed)}</span>
+            <span>👣 {moves} 步</span>
+          </div>
         </div>
         <Link href="/levels" className="bg-slate-700 text-xs px-3 py-1.5 rounded-lg hover:bg-slate-600 text-white border border-slate-600">放棄</Link>
       </div>
 
       <div ref={boardRef} className="flex-1 relative bg-slate-950 flex items-center justify-center p-2 overflow-hidden">
-         {/* 背景圖實裝：讀取 level.backgroundSrc */}
          <div className="w-[335px] h-[430px] max-h-full max-w-full aspect-[335/430] border-2 border-slate-700 rounded-2xl relative bg-slate-800/50 shadow-inner scale-95 origin-center transition-all overflow-hidden">
-            
             <img src={level.backgroundSrc} className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none" 
                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
 
@@ -234,12 +269,27 @@ export default function GameBoard({ level }: { level: Level }) {
         <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-slate-800 p-8 rounded-3xl border border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.3)] text-center max-w-[80%]">
             <div className="text-5xl mb-4 animate-bounce">🎉</div>
-            <h2 className="text-3xl font-black text-yellow-400 mb-4 drop-shadow-md">打卡成功！</h2>
-            <p className="text-slate-200 mb-6 leading-relaxed font-medium">{level.successMessage}</p>
+            <h2 className="text-3xl font-black text-yellow-400 mb-2 drop-shadow-md">打卡成功！</h2>
+            
+            {/* 戰績展示區塊 */}
+            <div className="bg-slate-900/80 rounded-xl p-4 mb-4 border border-slate-700">
+               <div className="flex justify-around text-slate-300">
+                 <div className="flex flex-col items-center">
+                   <span className="text-xs text-slate-400">通關時間</span>
+                   <span className="text-xl font-mono text-cyan-400 font-bold">{formatTime(timeElapsed)}</span>
+                 </div>
+                 <div className="flex flex-col items-center">
+                   <span className="text-xs text-slate-400">移動步數</span>
+                   <span className="text-xl font-mono text-yellow-400 font-bold">{moves}</span>
+                 </div>
+               </div>
+            </div>
+
+            <p className="text-slate-300 mb-6 text-sm leading-relaxed font-medium">{level.successMessage}</p>
             
             <button onClick={handleShare} className="bg-[#06C755] hover:bg-[#05b34c] text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2">
               <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 4.269 8.846 10.036 9.608.391.084.922.258 1.057.592.122.303.079.778.039 1.085l-.171 1.027c-.053.303-.242 1.186 1.039.647 1.281-.54 6.911-4.069 9.428-6.967 1.739-1.907 2.572-3.844 2.572-5.992z"/></svg>
-              分享給 LINE 好友
+              向好友炫耀戰績
             </button>
             
             <Link href="/levels" className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-xl w-full block shadow-lg transition-transform active:scale-95 border border-slate-600">
